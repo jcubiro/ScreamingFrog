@@ -1,0 +1,412 @@
+# -- LIBRARIES IMPORT -- 
+import numpy as np
+import pandas as pd
+import pymysql
+from sqlalchemy import create_engine
+
+# -- INPUTS FOR FUNCTIONS -- 
+
+## Database Access
+connector='mysql+pymysql://'
+user='root:'
+password='Agramunt54**'
+ip='@35.234.137.144/'
+db='Audit'
+engine='mysql+pymysql://jordi_seo:JrDE3NgZ7fdwfEEr@portals-business-intelligence.cdch0aebdtkv.eu-west-1.rds.amazonaws.com/seo_analysis'
+
+## Database Tables and Methods
+tables=["report_mts","duplicates_mts","inlinks_mts","history_mts"]
+method=['replace','replace','replace','append']
+
+## DataFrames for CSV Files
+PR=pd.read_csv("internal_all.csv")
+IL=pd.read_csv("all_inlinks.csv")
+DP=pd.read_csv("near_duplicates_report.csv")
+
+## Dataframes List for DB
+Dataframes=[PR,DP]
+
+
+## Values for Historicals
+html_to_history=['Backlinks Clusters','Canonicals','Traffic Clusters','Conversion Clusters','Position Clusters','OnPage Titles','OnPage MetaDescriptions','OnPage Word Count']
+html_suffixes=['_bckl','_cncls','_trfck','_conv','_pos','_tit','_mtde','_wdcnt']
+site_suffixes=['_arch','_sc']
+site_to_history=['Archives','Statuses']
+history=[]
+
+## Columns Lists That need to be droped BY DF
+dropPR=["Title 1 Pixel Width","Meta Description 1 Pixel Width","Meta Keyword 1","Meta Keywords 1 Length","H2-1","H2-1 length","H2-2","H2-2 length","URL Encoded Address",'HTTP rel="next" 1','HTTP rel="prev" 1','% of Total','Hash']
+dropIL=["Size (Bytes)","Alt Text","Type","Status","Status Code",'Link Path','Path Type','date']
+dropLIGHTLINKS=["Size (Bytes)","Alt Text","Type",'Link Path','Path Type', 'Status',
+       'Indexability Status', 'Title 1', 'Title 1 Length',
+       'Meta Description 1', 'Meta Description 1 Length', 'H1-1',
+       'H1-1 length', 'Meta Robots 1', 'X-Robots-Tag 1', 'Meta Refresh 1',
+       'Canonical Link Element 1', 'rel="next" 1', 'rel="prev" 1',
+       'Size (bytes)', 'Word Count', 'Text Ratio', 'Crawl Depth', 'Link Score',
+       'Inlinks', 'Unique Inlinks', 'Outlinks', 'Unique Outlinks',
+       'External Outlinks', 'Unique External Outlinks',
+       'Closest Similarity Match', 'No. Near Duplicates', 'Spelling Errors',
+       'Grammar Errors', 'Response Time', 'Last Modified', 'Redirect URL',
+       'Redirect Type', 'GA Sessions', 'GA % New Sessions', 'GA Users',
+       'GA New Users', 'GA Bounce Rate', 'GA Page Views Per Session',
+       'GA Avg Session Duration', 'GA Goal Conversion Rate All',
+       'GA Goal Completions All', 'GA Goal Value All',
+       'GA Goal 19 Completions', 'GA Goal 19 Value',
+       'GA Goal 19 Conversion Rate', 'GA Page Views', 'GA Unique Page Views',
+       'GA Avg Time on Page', 'GA Exits', 'GA Exit Rate', 'GA Page Value',
+       'Clicks', 'Impressions', 'CTR', 'Position', 'Ahrefs Backlinks - Exact',
+       'Ahrefs RefDomains - Exact', 'Ahrefs URL Rating - Exact','canonicals','folder','subfolder','num_of_near_duplicates','Canonicals','Rel','Target']
+dropDP=["Indexability","Indexability Status"]
+
+
+
+## Columns that need to be converted to datetime
+toTime=["GA Avg Session Duration","GA Avg Time on Page"]
+
+# -- FUNCTION CREATION -- 
+
+def droper(df,toDrop):
+    try:
+        for col in toDrop:
+            if col in df.columns:
+                del df[col]
+    except:
+        print('Could not drop',col)
+
+def dater(df):
+    try:
+        df['date']=pd.to_datetime('today')
+        df['date']=df['date'].apply(lambda x: x.strftime('%Y-%m-%d'))
+    except:
+        print("Heads Error")
+        
+def heads(DataFrames):
+    try:
+        for df in DataFrames:
+            df.columns=df.columns.str.replace(' ','_')
+            df.columns=df.columns.str.replace('-','_')
+            df.columns=df.columns.str.lower()
+    except:
+        print("Heads Error")
+
+        
+def canonicaliser(row):
+    try:
+        if row['Address'] == row['Canonical Link Element 1']:
+            val = "Self Canonical"
+        elif row['Canonical Link Element 1'] in (None, ""):
+            val = "Missing Canonical" 
+
+        elif row['Canonical Link Element 1'] != row['Address'] and row['Canonical Link Element 1'] != (''):
+            val = "Canonicalised" 
+        else:
+            val = "Other"
+        return val
+    except:
+        print("Canonicaliser Error")
+
+
+def totime(df,totimes):
+    try:
+        for col in totimes:
+            if col in df.columns:
+                df[col]=pd.to_datetime(df[col])
+                df[col]=df[col].dt.strftime('%H:%M:%S')
+                df[col]=pd.to_timedelta(df[col]).dt.total_seconds().astype(float)
+                df[col]=df[col].fillna(value=0)
+    except:
+        print("To Time Error")
+
+def toDB (dataframes,tables,method,engine):
+    tablenumber=0
+    n=0
+    for df in dataframes:
+        assignedtable=tables[tablenumber]
+        methodus=method[n] 
+        try:
+            sqlEngine =create_engine(engine, pool_recycle=3600)
+            dbConnection=sqlEngine.connect()
+            frame=df.to_sql(assignedtable, dbConnection, if_exists=methodus, index=False);
+            tablenumber=tablenumber+1
+            n=n+1
+    
+        except ValueError as vx:
+            print(vx)
+    
+        except Exception as ex:   
+            print(ex)
+    
+        else:
+            print("Table ",assignedtable," created successfully.");   
+        
+        finally:
+            dbConnection.close()
+
+
+def BacklinksClusters(row):
+    try:
+        if row['Ahrefs Backlinks - Exact']==0:
+            val = "No Backlinks"
+
+        elif row['Ahrefs Backlinks - Exact']>0 and row['Ahrefs Backlinks - Exact']<=10:
+            val = "Between 1 and 10 Backlinks"
+
+        elif row['Ahrefs Backlinks - Exact']>10 and row['Ahrefs Backlinks - Exact']<=20:
+            val = "Between 11 and 20 Backlinks"
+
+        elif row['Ahrefs Backlinks - Exact']>20 and row['Ahrefs Backlinks - Exact']<=30:
+            val = "Between 11 and 20 Backlinks"
+
+        else:
+            val = "More than 30 Backlinks"
+
+        return val
+    except:
+        print("Backlinks Clusters Error")
+            
+
+def TrafficClusters(row):
+    try:
+        if row['GA Users']==0 and row['Status']=='OK':
+            val= "URLs with No Users"
+        
+        elif row['GA Users']>0 and row['GA Users']<=10:
+            val= "Between 1 and 10 Users"
+
+        elif row['GA Users']>11 and row['GA Users']<=30:
+            val= "Between 11 and 30 Users"
+
+        elif row['GA Users']>30 and row['GA Users']<=60:
+            val= "Between 31 and 60 Users"
+
+        elif row['GA Users']>60 and row['GA Users']<=100:
+            val= "Between 61 and 100 Users"
+
+        elif row['GA Users']>100 and row['GA Users']<=150:
+            val= "Between 101 and 150 Users"
+
+        elif row['GA Users']>150 and row['GA Users']<=250:
+            val= "Between 151 and 250 Users"
+
+        elif row['GA Users']>250 and row['GA Users']<=350:
+            val= "Between 251 and 350 Users"
+
+        elif row['GA Users']>350 and row['Status']=='OK':
+            val= "More than 350 Users"
+
+        else: 
+            val="URLs with No Users"
+        
+        return val
+    
+    except:
+        print("Traffic Clusters Error")
+
+
+def ConversionClusters(row):
+    try:
+        if row['GA Goal 19 Completions']==0 and row['Status']=='OK':
+            val= "URLs with No C2Ps"
+        
+        elif row['GA Goal 19 Completions']>0 and row['GA Goal 19 Completions']<=10:
+            val= "Between 1 and 10 C2P"
+        
+        elif row['GA Goal 19 Completions']>10 and row['GA Goal 19 Completions']<=20:
+            val= "Between 11 and 30 C2P"
+    
+        elif row['GA Goal 19 Completions']>30 and row['GA Goal 19 Completions']<=50:
+            val= "Between 31 and 50 C2P"
+    
+        elif row['GA Goal 19 Completions']>50 and row['GA Goal 19 Completions']<=100:
+            val= "Between 51 and 100 C2P"
+        
+        elif row['GA Goal 19 Completions']>100:
+            val= "More than 100 C2P"
+                   
+        else: 
+            val="URLs with No C2Ps"
+        
+        return val
+    
+    except:
+        print('Conversion Cluster Error')
+
+def PositionClusters(row):
+    try:
+        if row['Position']>0 and row['Position']<=10 and row['Indexability']=='Indexable':
+            val= "URLs in TOP 10"
+        
+        elif row['Position']>10 and row['Position']<=20 and row['Indexability']=='Indexable':
+            val= "Between 11 and 20 Position"
+        
+        elif row['Position']>20 and row['Position']<=50 and row['Indexability']=='Indexable':
+            val= "Between 21 and 50 Position"
+    
+        elif row['Position']>50 and row['Position']<=100 and row['Indexability']=='Indexable':
+            val= "Between 50 and 100 Position"
+               
+        else: 
+            val=None
+        
+        return val
+    
+    except:
+        print("Positions Clusters Error")
+
+def onp_titles(row):
+    try:
+        if row['Title 1 Length'] >= 60:
+            val="Title Over 60 Characters" 
+        elif row['Title 1 Length'] <= 30:
+            val="Title Below 30 Characters"
+        else:
+            val="Title Extension OK"
+            
+        return val
+    except:
+        print('Onp. Titles Error')
+
+def onp_md(row):
+    try:
+        if row['Meta Description 1 Length']>160:
+            val="MetaDescription Over 160 Characters"
+        
+        elif row['Meta Description 1 Length']<80:
+            val="MetaDescription Below 80 Characters"
+            
+        else:
+            val="MetaDescription OK"
+        return val
+    except:
+        print('Onp. Md Error')
+
+def onp_word_count(row):
+    try:
+        if row['Word Count']>500:
+            val="Content Extension OK"
+        
+        else:
+            val="Low Word Count"
+        return val
+    except:
+        print('Onp. Word Count Error')
+
+def historicalizer(list_of_df,df,column_list,suffixes):  
+    """Passes list of df to history, the dataframe, the column list, and suffixes to use"""
+    n=0
+    try:
+        for k in column_list:
+            k=df[k].value_counts().add_suffix(suffixes[n])
+            k=k.to_frame()
+            k=k.transpose()
+            k.reset_index(drop=True, inplace=True)
+            list_of_df.append(k)
+            n=n+1
+    except:
+        print("Historicalizer Error")
+        
+def archive_types(row):
+    try:
+      if 'html' in row['Content Type']:
+          val='HTML'
+        
+      elif 'javascript'in row['Content Type']:
+          val='Javascript'
+    
+      elif 'image'in row['Content Type']:
+          val='Images'
+        
+      elif 'css'in row['Content Type']:
+          val='css'
+        
+      else:
+          val='other'
+      return val
+    except:
+      pass
+
+def status_types(row):
+    if str(row['Status Code']).startswith('2'):
+        val='2xx'
+        
+    elif str(row['Status Code']).startswith('3'):
+        val='3xx'
+        
+    elif str(row['Status Code']).startswith('4'):
+        val='4xx'
+        
+    elif str(row['Status Code']).startswith('5'):
+        val='5xx'
+        
+    else:
+        val='other'
+        
+    return val
+        
+# -- DATAFRAME LEVEL MODIFICATIONS --
+
+## Drop Columns
+droper(PR,dropPR)
+droper(IL,dropIL)
+droper(DP,dropDP)
+
+## ToTime Columns
+totime(PR,toTime)
+
+## Date Assignations
+dater(PR)
+dater(DP)
+
+
+# -- SINGLE DF MODIFICATIONS --
+
+## IL COLUMNS Rename
+IL.rename(columns={'Destination':'Address'},inplace=True)
+LIGHTLINKS=pd.merge(IL,PR,on='Address',how='inner')
+droper(LIGHTLINKS,dropLIGHTLINKS)
+todelete1=LIGHTLINKS[LIGHTLINKS['Content Type']!='text/html; charset=UTF-8'].index 
+LIGHTLINKS=LIGHTLINKS.drop(todelete1)
+todelete2=LIGHTLINKS[LIGHTLINKS['Source']==LIGHTLINKS['Address']].index
+LIGHTLINKS=LIGHTLINKS.drop(todelete2)
+Dataframes.append(LIGHTLINKS)
+
+## PR - CLUSTERS
+PR["Canonicals"]=PR.apply(canonicaliser,axis=1)
+PR["Backlinks Clusters"]=PR.apply(BacklinksClusters,axis=1)
+PR["Traffic Clusters"]=PR.apply(TrafficClusters,axis=1)
+PR["Conversion Clusters"]=PR.apply(ConversionClusters,axis=1)
+PR["Position Clusters"]=PR.apply(PositionClusters,axis=1)
+PR["OnPage Titles"]=PR.apply(onp_titles,axis=1)
+PR["OnPage MetaDescriptions"]=PR.apply(onp_md,axis=1)
+PR["OnPage Word Count"]=PR.apply(onp_word_count,axis=1)
+PR["Archives"]=PR.apply(archive_types,axis=1)
+PR["Statuses"]=PR.apply(status_types,axis=1)
+
+## PR Folders Clusterization
+folders = PR['Address'].str.split("/", expand = True)
+folders=folders.replace(r'^\s*$', np.nan, regex=True)
+folders[3]=folders[3].fillna('Homepage')
+PR['folder']=folders[3]
+PR['subfolder']=folders[4]
+
+## PR Column Rename
+PR.rename(columns={'No. Near Duplicates':'num_of_near_duplicates'},inplace=True)
+pr_html=PR[PR['Content Type']=='text/html; charset=UTF-8']
+# -- BUILDING HISTORICALS --
+historicalizer(history,pr_html,html_to_history,html_suffixes)
+historicalizer(history,PR,site_to_history,site_suffixes)
+historicals=pd.concat(history,axis=1) 
+historicals['URLs Crawled']=len(PR.index)
+historicals['duplicates_amount']=pr_html['num_of_near_duplicates'].sum()
+historicals.columns=historicals.columns.astype(str)
+dater(historicals)
+Dataframes.append(historicals)
+
+
+# -- STRINGS FORMATTING --
+heads(Dataframes)
+
+
+# -- DATABASE UPLOAD --
+
+toDB(Dataframes,tables,method,engine)
