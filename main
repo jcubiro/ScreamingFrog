@@ -90,20 +90,14 @@ def heads(DataFrames):
         print("Heads Error")
 
         
-def canonicaliser(row):
-    try:
-        if row['Address'] == row['Canonical Link Element 1']:
-            val = "Self Canonical"
-        elif row['Canonical Link Element 1'] in (None, ""):
-            val = "Missing Canonical" 
-
-        elif row['Canonical Link Element 1'] != row['Address'] and row['Canonical Link Element 1'] != (''):
-            val = "Canonicalised" 
-        else:
-            val = "Other"
-        return val
-    except:
-        print("Canonicaliser Error")
+def canonicaliser(df):
+    if df['Address'] == df['Canonical Link Element 1']:
+        return 'self canonical'
+    
+    elif pd.isnull(df['Canonical Link Element 1']):
+        return 'missing'
+    else:
+        return 'canonicalised'
 
 
 def totime(df,totimes):
