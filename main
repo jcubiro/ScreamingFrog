@@ -15,16 +15,18 @@ db='Audit'
 engine='mysql+pymysql://jordi_seo:JrDE3NgZ7fdwfEEr@portals-business-intelligence.cdch0aebdtkv.eu-west-1.rds.amazonaws.com/seo_analysis'
 
 ## Database Tables and Methods
-tables=["report_mts","duplicates_mts","inlinks_mts","history_mts"]
-method=['replace','replace','replace','append']
+tables=["report_test","duplicates_test","external_test","schema_test","inlinks_test","history_test"]
+method=['replace','replace','replace','replace','replace','append']
 
 ## DataFrames for CSV Files
 PR=pd.read_csv("internal_all.csv")
 IL=pd.read_csv("all_inlinks.csv")
 DP=pd.read_csv("near_duplicates_report.csv")
+EL=pd.read_csv("external_links.csv")
+SD=pd.read_csv("structured_data_all.csv")
 
 ## Dataframes List for DB
-Dataframes=[PR,DP]
+Dataframes=[PR,DP,EL,SD]
 
 
 ## Values for Historicals
@@ -98,7 +100,6 @@ def canonicaliser(df):
         return 'missing'
     else:
         return 'canonicalised'
-
 
 def totime(df,totimes):
     try:
@@ -199,22 +200,22 @@ def TrafficClusters(row):
 
 def ConversionClusters(row):
     try:
-        if row['GA Goal 19 Completions']==0 and row['Status']=='OK':
-            val= "URLs with No C2Ps"
+        if row['GA Goal 7 Completions']==0 and row['Status']=='OK':
+            val= "URLs with No SignUps"
         
-        elif row['GA Goal 19 Completions']>0 and row['GA Goal 19 Completions']<=10:
-            val= "Between 1 and 10 C2P"
+        elif row['GA Goal 7 Completions']>0 and row['GA Goal 19 Completions']<=10:
+            val= "Between 1 and 10 SignUps"
         
-        elif row['GA Goal 19 Completions']>10 and row['GA Goal 19 Completions']<=20:
-            val= "Between 11 and 30 C2P"
+        elif row['GA Goal 7 Completions']>10 and row['GA Goal 19 Completions']<=20:
+            val= "Between 11 and 30 SignUps"
     
-        elif row['GA Goal 19 Completions']>30 and row['GA Goal 19 Completions']<=50:
-            val= "Between 31 and 50 C2P"
+        elif row['GA Goal 7 Completions']>30 and row['GA Goal 19 Completions']<=50:
+            val= "Between 31 and 50 SignUps"
     
-        elif row['GA Goal 19 Completions']>50 and row['GA Goal 19 Completions']<=100:
-            val= "Between 51 and 100 C2P"
+        elif row['GA Goal 7 Completions']>50 and row['GA Goal 19 Completions']<=100:
+            val= "Between 51 and 100 SignUps"
         
-        elif row['GA Goal 19 Completions']>100:
+        elif row['GA Goal 7 Completions']>100:
             val= "More than 100 C2P"
                    
         else: 
@@ -301,23 +302,23 @@ def historicalizer(list_of_df,df,column_list,suffixes):
         
 def archive_types(row):
     try:
-      if 'html' in row['Content Type']:
-          val='HTML'
+        if 'html' in row['Content Type']:
+            return 'HTML'
         
-      elif 'javascript'in row['Content Type']:
-          val='Javascript'
+        elif 'javascript'in row['Content Type']:
+            return 'Javascript'
     
-      elif 'image'in row['Content Type']:
-          val='Images'
+        elif 'image'in row['Content Type']:
+            return 'Images'
         
-      elif 'css'in row['Content Type']:
-          val='css'
+        elif 'css'in row['Content Type']:
+            return 'css'
         
-      else:
-          val='other'
-      return val
+        else:
+            return'other'
+ 
     except:
-      pass
+        pass
 
 def status_types(row):
     if str(row['Status Code']).startswith('2'):
@@ -358,8 +359,8 @@ dater(DP)
 IL.rename(columns={'Destination':'Address'},inplace=True)
 LIGHTLINKS=pd.merge(IL,PR,on='Address',how='inner')
 droper(LIGHTLINKS,dropLIGHTLINKS)
-todelete1=LIGHTLINKS[LIGHTLINKS['Content Type']!='text/html; charset=UTF-8'].index 
-LIGHTLINKS=LIGHTLINKS.drop(todelete1)
+#todelete1=LIGHTLINKS[LIGHTLINKS['Content Type']!='text/html; charset=UTF-8'].index 
+#LIGHTLINKS=LIGHTLINKS.drop(todelete1)
 todelete2=LIGHTLINKS[LIGHTLINKS['Source']==LIGHTLINKS['Address']].index
 LIGHTLINKS=LIGHTLINKS.drop(todelete2)
 Dataframes.append(LIGHTLINKS)
